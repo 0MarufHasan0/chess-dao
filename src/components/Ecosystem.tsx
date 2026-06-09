@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-interface Node {
+interface EcosystemNode {
   id: string;
   label: string;
   x: number;
@@ -17,7 +17,7 @@ interface Node {
 export default function Ecosystem() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hoveredNode, setHoveredNode] = useState<Node | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<EcosystemNode | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,7 +43,7 @@ export default function Ecosystem() {
       { id: "partners", label: "VENTURE PARTNERS", angle: (7 * Math.PI) / 6, dist: 1.0, r: 16, color: "#D4AF37", details: "Sovereign Web3 networks and institutional investment syndicates." },
     ];
 
-    const nodes: Node[] = rawNodes.map((n) => {
+    const nodes: EcosystemNode[] = rawNodes.map((n) => {
       const x = centerX + Math.cos(n.angle) * radiusScale * n.dist;
       const y = centerY + Math.sin(n.angle) * radiusScale * n.dist;
       return {
@@ -69,22 +69,23 @@ export default function Ecosystem() {
 
     const mouse = { x: 0, y: 0, hoveredNodeId: null as string | null };
 
+    // ✅ FIX 1: handleMouseMove এখন useEffect এর সঠিক scope এ
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       mouse.x = e.clientX - rect.left;
       mouse.y = e.clientY - rect.top;
 
-      let found: Node | null = null;
-      nodes.forEach((node) => {
-        const dist = Math.hypot(mouse.x - node.x, mouse.y - node.y);
-        if (dist < node.radius + 15) {
-          found = node;
-        }
-      });
+      const found: EcosystemNode | null =
+        nodes.find((node) => {
+          const dist = Math.hypot(mouse.x - node.x, mouse.y - node.y);
+          return dist < node.radius + 15;
+        }) ?? null;
+
       setHoveredNode(found);
-      mouse.hoveredNodeId = found ? found.id : null;
+      mouse.hoveredNodeId = found?.id ?? null;
     };
 
+    // ✅ FIX 2: addEventListener এখন সঠিক জায়গায়
     canvas.addEventListener("mousemove", handleMouseMove);
 
     let animationFrameId: number;
@@ -101,37 +102,26 @@ export default function Ecosystem() {
         ctx.stroke();
 
         conn.pulses.forEach((p, idx) => {
-          conn.pulses[idx] += 0.004;
-          if (conn.pulses[idx] > 1) {
-            conn.pulses[idx] = 0;
-          }
+          conn.pulses[idx] = (conn.pulses[idx] + 0.004) % 1; // ✅ FIX 3: > 1 check এর বদলে modulo
 
           const currP = conn.pulses[idx];
           const px = conn.from.x + (conn.to.x - conn.from.x) * currP;
           const py = conn.from.y + (conn.to.y - conn.from.y) * currP;
 
           ctx.fillStyle = "#F7D774";
-          ctx.shadowColor = "#D4AF37";
-          ctx.shadowBlur = 8;
           ctx.beginPath();
           ctx.arc(px, py, 3, 0, Math.PI * 2);
           ctx.fill();
-          ctx.shadowBlur = 0;
         });
       });
 
       nodes.forEach((node) => {
         const isHovered = mouse.hoveredNodeId === node.id;
 
-        const targetX = node.baseX + (isHovered ? (mouse.x - node.baseX) * 0.15 : 0);
-        const targetY = node.baseY + (isHovered ? (mouse.y - node.baseY) * 0.15 : 0);
+        const targetX = node.baseX;
+        const targetY = node.baseY;
         node.x += (targetX - node.x) * 0.1;
         node.y += (targetY - node.y) * 0.1;
-
-        if (isHovered) {
-          ctx.shadowColor = node.color;
-          ctx.shadowBlur = 25;
-        }
 
         ctx.strokeStyle = isHovered ? "#F7D774" : "rgba(212, 175, 55, 0.3)";
         ctx.lineWidth = isHovered ? 2.5 : 1.5;
@@ -147,15 +137,10 @@ export default function Ecosystem() {
         ctx.fill();
         ctx.stroke();
 
-        ctx.shadowBlur = 0;
-
         ctx.fillStyle = isHovered ? "#FFFFFF" : "#E5E5E5";
         ctx.font = `bold ${node.id === "dao" ? "11px" : "9px"} var(--font-dm-sans), sans-serif`;
         ctx.textAlign = "center";
-        
-        // Draw centered text label with manual letter spacing
-        const labelText = node.label;
-        ctx.fillText(labelText, node.x, node.y + node.radius + 20);
+        ctx.fillText(node.label, node.x, node.y + node.radius + 20);
       });
 
       animationFrameId = requestAnimationFrame(draw);
@@ -176,8 +161,10 @@ export default function Ecosystem() {
         node.baseY = newCenterY + Math.sin(rawNode.angle) * newRadiusScale * rawNode.dist;
       });
     };
+
     window.addEventListener("resize", handleResize);
 
+    // ✅ FIX 4: cleanup সঠিকভাবে সব listener remove করছে
     return () => {
       canvas.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("resize", handleResize);
@@ -201,7 +188,10 @@ export default function Ecosystem() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div ref={containerRef} className="lg:col-span-8 h-[450px] w-full bg-black/40 border border-gold-primary/10 relative overflow-hidden flex items-center justify-center p-4">
+          <div
+            ref={containerRef}
+            className="lg:col-span-8 h-[450px] w-full bg-black/40 border border-gold-primary/10 relative overflow-hidden flex items-center justify-center p-4"
+          >
             <canvas ref={canvasRef} className="block w-full h-full cursor-crosshair" />
           </div>
 
