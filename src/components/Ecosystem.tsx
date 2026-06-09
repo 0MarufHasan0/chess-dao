@@ -74,12 +74,11 @@ export default function Ecosystem() {
       const rect = canvas.getBoundingClientRect();
       mouse.x = e.clientX - rect.left;
       mouse.y = e.clientY - rect.top;
-
-      const found: EcosystemNode | null =
-        nodes.find((node) => {
-          const dist = Math.hypot(mouse.x - node.x, mouse.y - node.y);
-          return dist < node.radius + 15;
-        }) ?? null;
+// ✅ এখন
+const found = nodes.find((node: EcosystemNode) => {
+  const dist = Math.hypot(mouse.x - node.x, mouse.y - node.y);
+  return dist < node.radius + 15;
+}) ?? null;
 
       setHoveredNode(found);
       mouse.hoveredNodeId = found?.id ?? null;
